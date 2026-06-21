@@ -1,0 +1,49 @@
+# =========================
+# Data and Output Files
+# =========================
+# Ignore HDF5 files and other heavy data formats
+*.h5
+*.hdf5
+*.csv
+*.dat
+*.npy
+*.npz
+
+# =========================
+# HPC / PBS Pro Outputs
+# =========================
+# When you submit jobs on NSCC, PBS generates output/error logs based on Job IDs.
+# E.g., job_script.o1234567 and job_script.e1234567
+*.o[0-9]*
+*.e[0-9]*
+*.log
+
+# =========================
+# Python & Environments
+# =========================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env/
+env/
+venv/
+swimmer_sim/
+.conda/
+
+# =========================
+# Jupyter Notebooks
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# OS Generated Files
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
