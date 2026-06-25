@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -q normal
+#PBS -N temporal_convergence
+#PBS -l select=1:ncpus=4:ngpus=1:mem=32gb
+#PBS -l walltime=02:00:00
+#PBS -P 11004323
+#PBS -o temporal_convergence.out
+#PBS -e temporal_convergence.err
+
+# Navigate to the directory where you submitted the job
+cd $PBS_O_WORKDIR
+
+# Load the Conda module
+module load miniforge3
+
+# Activate the environment in the .yml file
+source activate dip_swim_env
+
+# Run the python script
+python temporal_convergence_test.py
