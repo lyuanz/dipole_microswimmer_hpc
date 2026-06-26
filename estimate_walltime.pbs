@@ -1,0 +1,34 @@
+#!/bin/bash
+#PBS -P 11004323
+#PBS -N walltime_est
+#PBS -q normal                               
+#PBS -j oe                                     
+#PBS -o walltime_est.log                        
+#PBS -l select=1:ncpus=8:ngpus=1:mem=32gb
+#PBS -l walltime=02:00:00
+
+# Navigate to the directory where you submitted the job
+cd $PBS_O_WORKDIR
+
+# Load the Conda module
+module load miniforge3
+
+# Activate the environment in the .yml file
+source activate dip_swim_env
+
+# JAX/XLA optimization flags
+export XLA_PYTHON_CLIENT_PREALLOCATE=false       
+export OMP_NUM_THREADS=8                         
+
+# ---------------------------------------------------------
+# 3. Execution
+# ---------------------------------------------------------
+echo "Estimator started at: $(date)"
+echo "Running on host: $HOSTNAME"
+echo "---------------------------------------------------"
+
+# Execute the walltime estimator script
+python estimate_walltime.py
+
+echo "---------------------------------------------------"
+echo "Estimator finished at: $(date)"
