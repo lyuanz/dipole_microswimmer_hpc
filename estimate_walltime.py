@@ -6,9 +6,7 @@ import jax.numpy as jnp
 # Import simulation builders from the core file
 from core_functions import build_quasi2d_stokes_solver, build_trajectory_generator
 
-jax.config.update("jax_enable_x64", True)
-
-def format_slurm_time(seconds):
+def format_time(seconds):
     """Converts seconds into Slurm's HH:MM:SS format."""
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
@@ -35,7 +33,7 @@ if __name__ == "__main__":
     
     # Benchmarking parameters
     warmup_steps = 2
-    benchmark_steps = 100
+    benchmark_steps = 30
 
     print("Setting up arrays...")
     key = jax.random.PRNGKey(42)
@@ -90,5 +88,5 @@ if __name__ == "__main__":
     print(f"Projected Raw Time:      {projected_raw_time:.2f} seconds")
     print(f"With 20% Safety Buffer:  {recommended_time:.2f} seconds")
     print(f"{'='*40}")
-    print(f"RECOMMENDED SLURM WALLTIME:  #SBATCH --time={format_slurm_time(recommended_time)}")
+    print(f"RECOMMENDED WALLTIME:  #SBATCH --time={format_time(recommended_time)}")
     print(f"{'='*40}\n")

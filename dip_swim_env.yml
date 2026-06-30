@@ -10,3 +10,4 @@ dependencies:
   - pip
   - pip:
       - jax[cuda12]
+      - jax-md
