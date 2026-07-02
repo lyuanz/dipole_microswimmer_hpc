@@ -3,6 +3,8 @@ import math
 import jax
 import jax.numpy as jnp
 
+jax.config.update("jax_enable_x64", True)
+
 # Import simulation builders from the core file
 from core_functions import build_quasi2d_stokes_solver, build_trajectory_generator
 
@@ -18,10 +20,10 @@ if __name__ == "__main__":
     # 1. Target Parameters
     domain_size = 64
     vol_fraction = 0.1
-    N = int(vol_fraction * domain_size**3)
+    N = int(vol_fraction * domain_size**2)
     Lx, Ly, Lz = domain_size, domain_size, domain_size
     dt = 0.05
-    total_t = 200
+    total_t = 1000
     target_num_steps = int(round(total_t / dt)) 
     v0 = 0.5
     Dr = 0.01
@@ -31,6 +33,14 @@ if __name__ == "__main__":
     total_nodes = int(round(domain_size / grid_size))
     Nx, Ny, Nz = total_nodes, total_nodes, total_nodes
     
+    # 2. Neighbor List Parameter Setup
+    sigma_rep = 2.0 * eps
+    r_cutoff = 3.0 * sigma_rep
+    tracking_radius = r_cutoff + eps  
+    particle_radius = 0.5 * sigma_rep
+    # 2D packing physics for maximum neighbors capacity
+    max_neighbors = int(0.9 * (tracking_radius / particle_radius)**2)
+
     # Benchmarking parameters
     warmup_steps = 2
     benchmark_steps = 30
@@ -42,8 +52,12 @@ if __name__ == "__main__":
     init_angles = jax.random.uniform(angle_key, shape=(N,), minval=0.0, maxval=2.0 * jnp.pi)
     dipole_strengths = 5.0 * jnp.ones(N)
 
-    # Instantiate Solvers
-    solve_flow_fn = build_quasi2d_stokes_solver(Lx, Ly, Lz, Nx, Ny, Nz, mu, eps, v0)
+    # 3. Instantiate Solvers - Extract both solver and neighbor list function
+    solve_flow_fn, neighbor_fn = build_quasi2d_stokes_solver(Lx, Ly, Lz, Nx, Ny, Nz, mu, eps, v0)
+    
+    # Pre-allocate the neighbor list structure
+    nbrs_init = neighbor_fn.allocate(init_positions, extra_capacity=max_neighbors)
+    
     sim_fn = build_trajectory_generator(Lx, Ly, dt, solve_flow_fn, dipole_strengths, v0, Dr)
 
     # ---------------------------------------------------------
@@ -52,7 +66,8 @@ if __name__ == "__main__":
     print(f"\n[Phase 1] Forcing JIT Compilation ({warmup_steps} steps)...")
     start_compile = time.time()
     
-    warmup_traj = sim_fn(init_positions, init_angles, warmup_steps, key)
+    # Pass nbrs_init to the trajectory generator
+    warmup_traj = sim_fn(init_positions, init_angles, nbrs_init, warmup_steps, key)
     warmup_traj[0].block_until_ready() 
     
     compile_time = time.time() - start_compile
@@ -64,7 +79,8 @@ if __name__ == "__main__":
     print(f"\n[Phase 2] Benchmarking execution speed ({benchmark_steps} steps)...")
     start_bench = time.time()
     
-    bench_traj = sim_fn(init_positions, init_angles, benchmark_steps, key)
+    # Pass nbrs_init to the trajectory generator
+    bench_traj = sim_fn(init_positions, init_angles, nbrs_init, benchmark_steps, key)
     bench_traj[0].block_until_ready() 
     
     bench_time = time.time() - start_bench

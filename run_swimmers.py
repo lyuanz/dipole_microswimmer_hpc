@@ -13,10 +13,10 @@ if __name__ == "__main__":
     # 1. Physical Parameters
     domain_size = 64
     vol_fraction = 0.1
-    N = int(vol_fraction * domain_size**3)
+    N = int(vol_fraction * domain_size**2)
     Lx, Ly, Lz = domain_size, domain_size, domain_size
     dt = 0.05
-    total_t = 200
+    total_t = 1000
     num_steps = int(round(total_t / dt)) 
     v0 = 0.5
     Dr = 0.01
@@ -28,9 +28,18 @@ if __name__ == "__main__":
     # Must be powers of 2 for optimal FFT efficiency
     Nx, Ny, Nz = total_nodes, total_nodes, total_nodes
 
+    # 2. Neighbor List Parameter Setup
+    sigma_rep = 2.0 * eps
+    r_cutoff = 3.0 * sigma_rep
+    tracking_radius = r_cutoff + eps  
+    particle_radius = 0.5 * sigma_rep
+    
+    # 2D packing physics for mathematically safe neighbor capacity
+    max_neighbors = int(0.9 * (tracking_radius / particle_radius)**2)
+
     print(f"Initializing simulation for {N} swimmers across {num_steps} steps...")
     
-    # 2. PRNG and Initialization
+    # 3. PRNG and Initialization
     key = jax.random.PRNGKey(42)  # Seed
     key, pos_key, angle_key = jax.random.split(key, 3)
     
@@ -38,22 +47,32 @@ if __name__ == "__main__":
     init_positions = jax.random.uniform(pos_key, shape=(N, 2), minval=0.0, maxval=Lx)
     init_angles = jax.random.uniform(angle_key, shape=(N,), minval=0.0, maxval=2.0 * jnp.pi)
     
-    # Half pushers (+1.0), half pullers (-1.0)
+    # NOTE: Set to all pushers (+5.0)
     dipole_strengths = 5.0 * jnp.ones(N)
 
-    # 3. Instantiate Solvers
-    solve_flow_fn = build_quasi2d_stokes_solver(Lx, Ly, Lz, Nx, Ny, Nz, mu, eps, v0)
+    # 4. Instantiate Solvers and Pre-allocate Neighbors
+    solve_flow_fn, neighbor_fn = build_quasi2d_stokes_solver(Lx, Ly, Lz, Nx, Ny, Nz, mu, eps, v0)
+    
+    # Pre-allocate the neighbor list structure
+    nbrs_init = neighbor_fn.allocate(init_positions, extra_capacity=max_neighbors)
+    
     sim_fn = build_trajectory_generator(Lx, Ly, dt, solve_flow_fn, dipole_strengths, v0, Dr)
 
-    # 4. Execute the Simulation (JIT compiles on first step)
+    # 5. Execute the Simulation (JIT compiles on first step)
     print("Compilation and Execution started...")
-    positions_traj, angles_traj = sim_fn(init_positions, init_angles, num_steps, key)
+    
+    # Pass nbrs_init to the trajectory generator
+    trajectories = sim_fn(init_positions, init_angles, nbrs_init, num_steps, key)
+    
+    # Unpack the results safely 
+    positions_traj = trajectories[0]
+    angles_traj = trajectories[1]
     
     # Force evaluation of JAX arrays before saving to measure true compute time
     positions_traj.block_until_ready()
     print("Simulation complete! Preparing HDF5 write operations...")
 
-    # 5. Export to HDF5 Compressed File
+    # 6. Export to HDF5 Compressed File
     output_filename = "swimmer_trajectory.h5"
     
     with h5py.File(output_filename, "w") as f:
