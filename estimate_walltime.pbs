@@ -1,11 +1,11 @@
 #!/bin/bash
 #PBS -P 11004323
-#PBS -N walltime_est
+#PBS -N estimate_walltime
 #PBS -q normal                               
 #PBS -j oe                                     
-#PBS -o walltime_est.log                        
+#PBS -o estimate_walltime.log                        
 #PBS -l select=1:ncpus=8:ngpus=1:mem=32gb
-#PBS -l walltime=02:00:00
+#PBS -l walltime=01:00:00
 
 # Navigate to the directory where you submitted the job
 cd $PBS_O_WORKDIR

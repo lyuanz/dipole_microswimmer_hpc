@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     # 1. Target Parameters
     domain_size = 64
-    vol_fraction = 0.1
+    vol_fraction = 0.6
     N = int(vol_fraction * domain_size**2)
     Lx, Ly, Lz = domain_size, domain_size, domain_size
     dt = 0.05
@@ -48,7 +48,26 @@ if __name__ == "__main__":
     print("Setting up arrays...")
     key = jax.random.PRNGKey(42)
     key, pos_key, angle_key = jax.random.split(key, 3)
-    init_positions = jax.random.uniform(pos_key, shape=(N, 2), minval=0.0, maxval=Lx)
+    
+    # Calculate how many particles we need per row/column to fit N particles
+    num_per_side = int(jnp.ceil(jnp.sqrt(N)))
+    
+    # Calculate the exact spacing needed to fill the box evenly
+    spacing = Lx / num_per_side
+    
+    # Create the 2D grid coordinates
+    grid_1d = jnp.arange(num_per_side) * spacing + (spacing / 2.0)
+    X, Y = jnp.meshgrid(grid_1d, grid_1d)
+    grid_positions = jnp.column_stack((X.ravel(), Y.ravel()))
+    
+    # Take exactly N positions (since the grid might have a few extra slots)
+    init_positions = grid_positions[:N]
+    
+    # Add a tiny, safe micro-noise to break perfect grid symmetry
+    # (Keeps them from being perfectly locked in unstable equilibriums)
+    noise = jax.random.uniform(pos_key, shape=(N, 2), minval=-0.1*spacing, maxval=0.1*spacing)
+    init_positions = init_positions + noise
+    
     init_angles = jax.random.uniform(angle_key, shape=(N,), minval=0.0, maxval=2.0 * jnp.pi)
     dipole_strengths = 5.0 * jnp.ones(N)
 

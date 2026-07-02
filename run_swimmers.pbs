@@ -3,9 +3,9 @@
 #PBS -N swimmer_prod
 #PBS -q normal                               
 #PBS -j oe                                     
-#PBS -o swimmer_prod.log                        
+#PBS -o run_swimmers.log                        
 #PBS -l select=1:ncpus=8:ngpus=1:mem=32gb
-#PBS -l walltime=04:00:00
+#PBS -l walltime=03:30:00
 
 # Navigate to the directory where you submitted the job
 cd $PBS_O_WORKDIR
