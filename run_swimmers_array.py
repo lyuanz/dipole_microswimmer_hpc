@@ -28,7 +28,7 @@ if __name__ == "__main__":
     total_t = 1000
     num_steps = int(round(total_t / dt)) 
     v0 = 0.5
-    Dr = 0.00  # Pure hydrodynamic alignment
+    Dr = 1
     mu = 1.0
     eps = 0.5
     grid_size = 0.25
