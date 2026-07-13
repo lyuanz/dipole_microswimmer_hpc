@@ -3,7 +3,7 @@
 #PBS -N analyze_swimmers
 #PBS -q normal
 #PBS -j oe                                      
-#PBS -o run_swimmers_array_log_Dr_1e-4/radial_distribution.log                        
+#PBS -o run_swimmers_array_log_Dr_1/radial_distribution.log                        
 #PBS -l select=1:ncpus=32:mem=128gb
 #PBS -l walltime=02:00:00
 
@@ -26,7 +26,7 @@ echo "Running on host: $HOSTNAME"
 echo "---------------------------------------------------"
 
 # Navigate to high-capacity scartch directory
-cd /scratch/users/nus/e0028670/run_swimmers_array_data_Dr_1e-4
+cd /scratch/users/nus/e0028670/run_swimmers_array_data_Dr_1
 
 # Execute the python script
 python $PBS_O_WORKDIR/radial_distribution.py
