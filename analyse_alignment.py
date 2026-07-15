@@ -17,7 +17,7 @@ from data_analysis import *
 def process_alignment_file(filename):
     # 1. C(r) Analysis
     metrics_dict = extract_orientational_correlation(filename)
-    dt = metrics_dict["time_step"]
+    dt = metrics_dict["dt"]
     total_frames = metrics_dict["total_frames"]
     phi = metrics_dict["areal_fraction"]
     p_val = metrics_dict["dipole_strength"]
@@ -36,9 +36,7 @@ def process_alignment_file(filename):
     # Check if the first position element (index 0) isn't NaN to verify a peak was found
     if not np.isnan(ext_data[0]):
         r_cutoff = 1.1*ext_data[0]
-        max_tau_frames = total_frames // 10
-        start_frame = max_tau_frames // 100
-        tau_array, R_tau_array = compute_pair_angular_autocorrelation(filename, r_cutoff, start_frame, max_tau_frames)
+        tau_array, R_tau_array = compute_pair_angular_autocorrelation(filename, r_cutoff)
         tau_phys, tau_err = extract_diffusive_timescale(dt, R_tau_array)
         
     # Build the final array row effortlessly

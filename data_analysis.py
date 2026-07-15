@@ -118,26 +118,12 @@ def extract_structural_metrics(filename, r_max=5.0, n_bins=400, num_blocks=10):
         "bin_centers": bin_centers,
     }
 
-def extract_orientational_correlation(filename, r_max=5.0, n_bins=400, num_blocks=10):
+def extract_orientational_correlation(filename, r_max=4.0, n_bins=400, num_blocks=10):
     """
     Extracts the distance-dependent orientational correlation function, <cos(theta_ij)>(r),
     from an active matter HDF5 trajectory, utilizing temporal block averaging.
     
-    Parameters
-    ----------
-    filename : str
-        Path to the HDF5 trajectory file.
-    r_max : float
-        Maximum distance to compute the correlation up to.
-    n_bins : int
-        Number of radial bins.
-    num_blocks : int
-        Number of temporal blocks to split the steady-state trajectory into for error estimation.
-        
-    Returns
-    -------
-    results : dict
-        A dictionary containing the block-averaged C(r), its standard deviation, and the bin centers.
+    Optimized version using freud.density.CorrelationFunction to bypass Python overhead.
     """
     # 1. Open file and extract data
     with h5py.File(filename, 'r') as f:
@@ -158,45 +144,38 @@ def extract_orientational_correlation(filename, r_max=5.0, n_bins=400, num_block
     box = freud.box.Box(Lx=Lx, Ly=Ly, is2D=True)
     frame_3d_cache = np.zeros((N, 3), dtype=np.float32)
     
-    # Define bin edges and centers
-    bin_edges = np.linspace(0, r_max, n_bins + 1)
-    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    # Initialize Freud's built-in C++ Correlation Function
+    cf = freud.density.CorrelationFunction(bins=n_bins, r_max=r_max)
     
     block_Cr_list = []
 
     # 3. Compute block-averaged C(r)
     for block_frames in frame_blocks:
-        # Accumulators for this specific block
-        block_sums = np.zeros(n_bins, dtype=np.float64)
-        block_counts = np.zeros(n_bins, dtype=np.float64)
+        is_first_frame = True
         
         for frame_idx in block_frames:
             pos = positions[frame_idx]
             angs = angles[frame_idx]
             
-            # Freud requires 3D arrays
+            # Freud requires 3D coordinates
             frame_3d_cache[:, :2] = pos
             
-            # Query all neighbor pairs within r_max using AABB tree
-            aq = freud.locality.AABBQuery(box, frame_3d_cache)
-            nl = aq.query(frame_3d_cache, {'r_max': r_max, 'exclude_ii': True}).toNeighborList()
+            # Map angles to complex numbers on the unit circle (Euler's formula)
+            complex_orientations = np.exp(1j * angs)
             
-            distances = nl.distances
+            # Freud computes < v_i* v_j > entirely in C++, bypassing toNeighborList
+            # reset=is_first_frame clears the C++ histogram at the start of a block, 
+            # then accumulates the data for the rest of the block's frames.
+            cf.compute(
+                system=(box, frame_3d_cache), 
+                values=complex_orientations, 
+                reset=is_first_frame
+            )
+            is_first_frame = False
             
-            # nl.query_point_indices is 'i', nl.point_indices is 'j'
-            delta_theta = angs[nl.query_point_indices] - angs[nl.point_indices]
-            cos_theta = np.cos(delta_theta)
-            
-            # Use numpy's rapid histogram to bin the counts and the cos(theta) weights
-            counts, _ = np.histogram(distances, bins=bin_edges)
-            sums, _ = np.histogram(distances, bins=bin_edges, weights=cos_theta)
-            
-            block_counts += counts
-            block_sums += sums
-            
-        # Calculate the mean C(r) for this block, guarding against empty bins
-        safe_counts = np.where(block_counts > 0, block_counts, 1.0)
-        block_Cr = np.where(block_counts > 0, block_sums / safe_counts, 0.0)
+        # The real part of the complex correlation is exactly <cos(delta_theta)>
+        # We use np.nan_to_num to gracefully convert unpopulated bins from NaN to 0.0
+        block_Cr = np.nan_to_num(np.real(cf.correlation), nan=0.0)
         block_Cr_list.append(block_Cr)
 
     # 4. Final ensemble statistics across blocks
@@ -205,13 +184,13 @@ def extract_orientational_correlation(filename, r_max=5.0, n_bins=400, num_block
     final_Cr_std = np.std(block_Cr_array, axis=0)
     
     return {
-        "time_step": dt,
+        "dt": dt,
         "total_frames": total_frames,
         "areal_fraction": phi,
         "dipole_strength": p_val,
         "Cr_steady_state": final_Cr_mean,
         "Cr_std": final_Cr_std,
-        "bin_centers": bin_centers
+        "bin_centers": cf.bin_centers  # Extract centers directly from Freud
     }
     
 def extract_C_r_extrema(bin_centers, C_r_mean, n_extrema=3, prominence_frac=0.1):
@@ -248,7 +227,7 @@ def extract_C_r_extrema(bin_centers, C_r_mean, n_extrema=3, prominence_frac=0.1)
         
     return flat_extrema
     
-def compute_pair_angular_autocorrelation(filename, r_cutoff, start_frame, max_tau_frames):
+def compute_pair_angular_autocorrelation(filename, r_cutoff):
     """
     Vectorized computation of R(tau) using matrix slicing.
     """
@@ -259,6 +238,10 @@ def compute_pair_angular_autocorrelation(filename, r_cutoff, start_frame, max_ta
         Lx, Ly = f.attrs['Lx'], f.attrs['Ly']
 
     T, N = angles.shape
+    max_tau_frames = T // 10
+    start_frame = max_tau_frames // 100
+    step_t0 = max_tau_frames // 100
+    
     box = freud.box.Box(Lx=Lx, Ly=Ly, is2D=True)
     
     # 3D position buffer for freud
@@ -269,7 +252,7 @@ def compute_pair_angular_autocorrelation(filename, r_cutoff, start_frame, max_ta
     total_pairs = np.zeros(max_tau_frames + 1, dtype=np.float64)
 
     # 2. Loop only over reference frames (t0)
-    for t0 in range(start_frame, T - max_tau_frames):
+    for t0 in range(start_frame, T - max_tau_frames, step_t0):
         
         pos_t0 = positions[t0]
         angs_t0 = angles[t0]
@@ -319,19 +302,36 @@ def extract_diffusive_timescale(dt, R_tau):
     frames = np.arange(len(R_tau))  # your current x-axis (0 to 2000)
     t_array = frames * dt           # convert x-axis to physical time units
     
+    # 1. Define a reasonable initial guess (e.g., tau = 10 * dt)
+    p0 = [100 * dt]
+    
+    # 2. Enforce strict physical bounds: tau cannot be negative or 0
+    # Lower bound: a fraction of a timestep | Upper bound: infinite
+    bounds = (dt, np.inf)
+    
     # Perform the curve fit
-    # p0=[100.0] is an initial guess for tau in physical time units
     try:
-        popt, pcov = curve_fit(exponential_decay, t_array, R_tau, p0=[100.0])
+        popt, pcov = curve_fit(
+            exponential_decay, 
+            t_array, 
+            R_tau, 
+            p0=p0, 
+            bounds=bounds,
+            maxfev=2000
+        )
         tau_physical = popt[0]
+        
         # Check if pcov is infinite (happens in some degenerate fits)
         if np.isinf(pcov).any():
             tau_error = np.nan
         else:
             tau_error = np.sqrt(pcov[0, 0])
             
-    except RuntimeError:
-        # If the fit fails to converge, return NaNs instead of crashing the job
+    except Exception as e:
+        # If the fit fails to converge, print the reason to the PBS log file
+        print(f"  -> Fit failed to converge: {e}")
+        
+        # Return NaNs instead of crashing the job
         tau_physical = np.nan
         tau_error = np.nan
         
