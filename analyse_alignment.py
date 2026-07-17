@@ -58,7 +58,7 @@ def process_alignment_file(filename):
 # ==========================================
 if __name__ == "__main__":
     current_dir = os.getcwd()
-    search_pattern = "*.h5"
+    search_pattern = "swimmer_*.h5"
     output_filename = "compiled_alignment_order_results.h5"
     
     all_h5_files = sorted(glob.glob(search_pattern))

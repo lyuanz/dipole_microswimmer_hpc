@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -P 11004323
+#PBS -N swimmer_traj_unsteady
+#PBS -q normal
+#PBS -J 0-99                                      
+#PBS -j oe                                      
+#PBS -o swimmer_traj_unsteady_log_Dr_0/swimmer_traj_unsteady_Dr_0_^array_index^.log                         
+#PBS -l select=1:ncpus=8:ngpus=1:mem=32gb
+#PBS -l walltime=00:30:00
+
+cd $PBS_O_WORKDIR
+
+# Load the Conda module
+module load miniforge3
+
+# Activate the environment
+source activate dip_swim_env
+
+# JAX/XLA optimization flags
+export XLA_PYTHON_CLIENT_PREALLOCATE=false       
+export OMP_NUM_THREADS=8                         
+
+# ---------------------------------------------------------
+# Execution
+# ---------------------------------------------------------
+echo "Array Job ID: $PBS_ARRAY_INDEX"
+echo "Production run started at: $(date)"
+echo "Running on host: $HOSTNAME"
+echo "---------------------------------------------------"
+
+# Navigate to high-capacity scratch directory for the NEW unsteady data
+# (Make sure to create this directory before submitting the job!)
+cd /scratch/users/nus/e0028670/swimmer_traj_unsteady_data_Dr_0
+
+# Execute the python script and pass the array index to it
+python $PBS_O_WORKDIR/swimmer_traj_unsteady.py $PBS_ARRAY_INDEX
+
+echo "---------------------------------------------------"
+echo "Production run finished at: $(date)"

@@ -9,8 +9,7 @@ from scipy.optimize import curve_fit
 def quadratic_refine(bin_centers, y_values, idx):
     """
     Sub-bin refinement of a discrete extremum at idx via a parabola fit
-    through (idx-1, idx, idx+1). Returns (r_refined, y_refined) - both the
-    refined location AND the refined height/depth at that location.
+    through (idx-1, idx, idx+1). Returns (r_refined, y_refined).
     """
     # Quadratic fitting doesn't work if point of interest is at the boundary.
     if idx <= 0 or idx >= len(y_values) - 1:
@@ -29,6 +28,7 @@ def quadratic_refine(bin_centers, y_values, idx):
 
     r_refined = bin_centers[idx] + delta * dr
     y_refined = y1 - 0.25 * (y0 - y2) * delta
+    
     return r_refined, y_refined
 
 
@@ -118,7 +118,7 @@ def extract_structural_metrics(filename, r_max=5.0, n_bins=400, num_blocks=10):
         "bin_centers": bin_centers,
     }
 
-def extract_orientational_correlation(filename, r_max=4.0, n_bins=400, num_blocks=10):
+def extract_orientational_correlation(filename, r_max=5.0, n_bins=400, num_blocks=10):
     """
     Extracts the distance-dependent orientational correlation function, <cos(theta_ij)>(r),
     from an active matter HDF5 trajectory, utilizing temporal block averaging.
@@ -173,9 +173,14 @@ def extract_orientational_correlation(filename, r_max=4.0, n_bins=400, num_block
             )
             is_first_frame = False
             
-        # The real part of the complex correlation is exactly <cos(delta_theta)>
-        # We use np.nan_to_num to gracefully convert unpopulated bins from NaN to 0.0
-        block_Cr = np.nan_to_num(np.real(cf.correlation), nan=0.0)
+        # Get real correlation and the actual counts for this block
+        block_Cr = np.real(cf.correlation).copy()
+        counts = cf.bin_counts
+        
+        # STATISTICAL FILTER: Mask bins that don't have enough pair counts in this block
+        min_counts = 0.01 * np.max(counts)
+        block_Cr[counts < min_counts] = np.nan
+        block_Cr = np.nan_to_num(block_Cr, nan=0.0)
         block_Cr_list.append(block_Cr)
 
     # 4. Final ensemble statistics across blocks
@@ -192,7 +197,7 @@ def extract_orientational_correlation(filename, r_max=4.0, n_bins=400, num_block
         "Cr_std": final_Cr_std,
         "bin_centers": cf.bin_centers  # Extract centers directly from Freud
     }
-    
+   
 def extract_C_r_extrema(bin_centers, C_r_mean, n_extrema=3, prominence_frac=0.1):
     """
     Extract the first few significant extrema of C(r) in order, returning
@@ -200,7 +205,7 @@ def extract_C_r_extrema(bin_centers, C_r_mean, n_extrema=3, prominence_frac=0.1)
     a fixed shape of (3 * n_extrema,) for rectangular HDF5 compatibility.
     """
     nonzero = np.where(np.abs(C_r_mean) > 1e-9)[0]
-    contact_idx = nonzero[0] if len(nonzero) else 0
+    contact_idx = max(0, nonzero[0]-5) if len(nonzero) else 0
     region = C_r_mean[contact_idx:]
 
     prominence = prominence_frac * np.max(np.abs(region))
@@ -219,7 +224,11 @@ def extract_C_r_extrema(bin_centers, C_r_mean, n_extrema=3, prominence_frac=0.1)
     # Fill in the extracted extrema up to n_extrema
     for idx, (i, kind_val) in enumerate(candidates[:n_extrema]):
         true_idx = contact_idx + i
-        r_refined, C_refined = quadratic_refine(bin_centers, C_r_mean, true_idx)
+        if idx == 0:
+            r_refined = bin_centers[true_idx]
+            C_refined = C_r_mean[true_idx]
+        else:
+            r_refined, C_refined = quadratic_refine(bin_centers, C_r_mean, true_idx)
         
         # Calculate the starting slice index for this specific peak
         start_slot = idx * 3
