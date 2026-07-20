@@ -1,10 +1,10 @@
 #!/bin/bash
 #PBS -P personal-e0028670
-#PBS -N swimmer_traj_unsteady
+#PBS -N swimmer_traj_quad
 #PBS -q normal
 #PBS -J 0-99                                      
 #PBS -j oe                                      
-#PBS -o swimmer_traj_unsteady_log_Dr_0/swimmer_traj_unsteady_Dr_0_^array_index^.log                         
+#PBS -o swimmer_traj_quad_log_Dr_0/swimmer_traj_quad_Dr_0_^array_index^.log                         
 #PBS -l select=1:ncpus=8:ngpus=1:mem=32gb
 #PBS -l walltime=00:30:00
 
@@ -28,12 +28,13 @@ echo "Production run started at: $(date)"
 echo "Running on host: $HOSTNAME"
 echo "---------------------------------------------------"
 
-# Navigate to high-capacity scratch directory for the NEW unsteady data
+# Navigate to high-capacity scratch directory for the NEW steady data
 # (Make sure to create this directory before submitting the job!)
-cd /scratch/users/nus/e0028670/swimmer_traj_unsteady_data_Dr_0
+cd /scratch/users/nus/e0028670/swimmer_traj_quad_data_Dr_0
 
 # Execute the python script and pass the array index to it
-python $PBS_O_WORKDIR/swimmer_traj_unsteady.py $PBS_ARRAY_INDEX
+# (Assumes you name the script from the previous step 'swimmer_traj_steady.py')
+python $PBS_O_WORKDIR/swimmer_traj_quad.py $PBS_ARRAY_INDEX
 
 echo "---------------------------------------------------"
 echo "Production run finished at: $(date)"

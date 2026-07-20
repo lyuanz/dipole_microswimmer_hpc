@@ -1,7 +1,8 @@
-Starting Stiff Scattering Spatial Convergence Test...
+Starting Stiff Scattering Spatial Convergence Test (Unsteady)...
 
 ---------------------------------------------------------------------------
-Fixed dt: 0.1 (200 steps)
+Fixed dt: 0.05 (400 steps)
+Testing extreme amplitude: 12.5 (100x baseline)
 Total Physical Time: 20.0
 ---------------------------------------------------------------------------
 Solving for resolution: 32x32x32...
@@ -16,9 +17,9 @@ Calculating Spatial Convergence Metrics Across Entire Timeline...
 Ground Truth Resolution: 512x512x512
 Resolution      | Max Peak Error     | Time-Avg Error     | Max Pack Diff (%)
 --------------------------------------------------------------------------------
-32x32x32        | 4.831861e-02       | 2.503238e-02       | 4.831861 %
-64x64x64        | 2.914114e-02       | 1.701571e-02       | 2.914114 %
-128x128x128     | 2.779384e-02       | 1.643509e-02       | 2.779384 %
-256x256x256     | 8.416841e-03       | 3.952929e-03       | 0.841684 %
+32x32x32        | 1.372707e-03       | 6.923038e-04       | 0.137271 %
+64x64x64        | 1.487195e-04       | 6.279331e-05       | 0.014872 %
+128x128x128     | 7.303148e-05       | 2.379104e-05       | 0.007303 %
+256x256x256     | 3.247629e-05       | 1.034398e-05       | 0.003248 %
 
 Test Complete.

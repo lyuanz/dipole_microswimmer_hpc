@@ -1,24 +1,25 @@
-Starting Stiff Scattering Temporal Convergence Test...
+Starting Stiff Scattering Temporal Convergence Test (Unsteady)...
 
--------------------------------------------------------
-Fixed Grid Resolution: 256x256x256
+-----------------------------------------------------------------
+Fixed Grid Resolution: 64x64x64
 Total Physical Time: 20.0
--------------------------------------------------------
+Testing extreme amplitude: 12.5 (100x baseline)
+-----------------------------------------------------------------
 Solving for dt = 0.1      (200 steps)...
 Solving for dt = 0.05     (400 steps)...
 Solving for dt = 0.025    (800 steps)...
 Solving for dt = 0.0125   (1600 steps)...
 Solving for dt = 0.00625  (3200 steps)...
--------------------------------------------------------
+-----------------------------------------------------------------
 
 Calculating Convergence Metrics Across Entire Timeline...
 
 Ground Truth dt: 0.00625
 dt         | Max Peak Error     | Time-Avg Error     | Max Pack Diff (%)
 ---------------------------------------------------------------------------
-0.10000    | 1.340927e-02       | 5.332023e-03       | 1.340927 %
-0.05000    | 5.370071e-03       | 2.100645e-03       | 0.537007 %
-0.02500    | 2.249286e-03       | 8.542007e-04       | 0.224929 %
-0.01250    | 7.619812e-04       | 2.913306e-04       | 0.076198 %
+0.10000    | 9.096833e-05       | 4.970960e-05       | 0.009097 %
+0.05000    | 4.019015e-05       | 2.317526e-05       | 0.004019 %
+0.02500    | 1.696504e-05       | 9.927477e-06       | 0.001697 %
+0.01250    | 5.586362e-06       | 3.308365e-06       | 0.000559 %
 
 Test Complete.

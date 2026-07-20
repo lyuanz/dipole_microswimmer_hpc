@@ -5,12 +5,12 @@ import numpy as np
 # Enable 64-bit precision globally
 jax.config.update("jax_enable_x64", True) 
 
-# Import your updated functions
-from core_functions import build_quasi2d_stokes_solver, build_trajectory_generator
+# Import the updated unsteady functions
+from core_functions_unsteady import build_quasi2d_stokes_solver, build_trajectory_generator
 
 if __name__ == "__main__":
     # 1. Fixed Spatial Parameters
-    grid_resolution = 256
+    grid_resolution = 128
     grid_limit = 64
     Lx, Ly, Lz = grid_limit, grid_limit, grid_limit
     Nx, Ny, Nz = grid_resolution, grid_resolution, grid_resolution
@@ -18,13 +18,23 @@ if __name__ == "__main__":
     # 2. Physics & Kinematics Setup
     N_swimmers = 2
     Dr_scatter = 0.0  # Zero noise to isolate hydrodynamics
-    sigmas_scatter = jnp.array([5.0, 5.0])  # Two strong Pushers
+    v0 = 0.5
+    
+    # --- UNSTEADY EXTREME CASE ---
+    # Test the highest amplitude from parameter sweep to ensure dt is safe
+    p_const_val = 0.125
+    p_amp_val = 100.0 * p_const_val 
+    omega = 2.0 * jnp.pi
+    
+    sigma_const = jnp.array([p_const_val, p_const_val])
+    sigma_amp = jnp.array([p_amp_val, p_amp_val])
+    phases = jnp.array([0.0, 0.0]) # Synchronized phases, as requested in your production script
     
     eps = 0.5
     sigma_rep = 2.0 * eps
     r_cutoff = 3.0 * sigma_rep
     
-    # Total physical time
+    # Total physical time (20 time units allows the swimmers to cross paths)
     T_end = 20.0 
     
     # 3. Setup Initial Conditions: Swimming towards each other
@@ -42,26 +52,25 @@ if __name__ == "__main__":
 
     # 4. Time steps (dt) to test. The SMALLEST dt is our "Ground Truth"
     dt_values = [
-        0.1, 
-        0.05, 
-        0.025, 
-        0.0125, 
-        0.00625  # Ground truth
+        1e-1, 
+        5e-2, 
+        2.5e-2, 
+        1.25e-2, 
+        6.25e-3  # Ground truth
     ]
 
     final_states = {}
 
-    print("Starting Stiff Scattering Temporal Convergence Test...\n")
-    print("-" * 55)
+    print("Starting Stiff Scattering Temporal Convergence Test (Unsteady)...\n")
+    print("-" * 65)
     print(f"Fixed Grid Resolution: {Nx}x{Ny}x{Nz}")
     print(f"Total Physical Time: {T_end}")
-    print("-" * 55)
+    print(f"Testing extreme amplitude: {p_amp_val} (100x baseline)")
+    print("-" * 65)
 
     # 5. Build the spatial solver and neighbor list ONCE
-    # Unpack both the solver and the neighbor generator
     solve_flow_fn, neighbor_fn = build_quasi2d_stokes_solver(
-        Lx=Lx, Ly=Ly, Lz=Lz, 
-        Nx=Nx, Ny=Ny, Nz=Nz
+        Lx, Ly, Lz, Nx, Ny, Nz, mu=1.0, eps=eps, v0=v0
     )
     
     # Pre-allocate neighbor list using 2D packing physics
@@ -76,14 +85,14 @@ if __name__ == "__main__":
         num_steps = int(round(T_end / dt))
         print(f"Solving for dt = {dt:<8} ({num_steps} steps)...")
         
-        # Build trajectory generator for this specific dt
+        # Build trajectory generator for this specific dt with unsteady arrays
         generate_trajectory = build_trajectory_generator(
-            Lx=Lx, Ly=Ly, dt=dt, 
-            solve_flow_fn=solve_flow_fn, sigmas=sigmas_scatter, 
-            Dr=Dr_scatter
+            Lx, Ly, dt, solve_flow_fn, 
+            sigma_const, sigma_amp, omega, phases, 
+            v0=v0, Dr=Dr_scatter
         )
         
-        # Run simulation - Pass nbrs_init to the generator
+        # Run simulation
         pos_hist, _ = generate_trajectory(
             initial_positions, initial_angles, nbrs_init, num_steps, key
         )
@@ -91,7 +100,7 @@ if __name__ == "__main__":
         # Extract all positions over time
         final_states[dt] = pos_hist
 
-    print("-" * 55)
+    print("-" * 65)
     print("\nCalculating Convergence Metrics Across Entire Timeline...\n")
 
     ground_truth_dt = dt_values[-1]
@@ -130,7 +139,7 @@ if __name__ == "__main__":
         max_peak_error = jnp.max(error_over_time)
         time_avg_error = jnp.mean(error_over_time)
         
-        # Calculate fractional difference relative to the physical swimmer size
+        # Calculate fractional difference relative to the physical swimmer size (sigma_rep)
         fractional_max_diff = (max_peak_error / sigma_rep) * 100
         
         # Print formatted results
